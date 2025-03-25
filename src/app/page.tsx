@@ -57,16 +57,36 @@ export default function Page() {
     if (graphRef.current && node.x !== undefined && node.y !== undefined) {
       // Center on node position with 1000ms transition
       graphRef.current.centerAt(node.x, node.y, 1000);
-      // Zoom to level 2 with 1000ms transition
-      graphRef.current.zoom(2, 1000);
+      // Zoom to level 3 with 1000ms transition
+      graphRef.current.zoom(3, 1000);
 
       // Toggle selection: if clicking the already selected node, deselect it
       setSelectedNode(selectedNode === node.id ? null : node.id);
     }
   };
 
+  // Handle reset button click
+  const handleReset = () => {
+    // Clear node selection
+    setSelectedNode(null);
+
+    // Reset zoom and center if graph is available
+    if (graphRef.current) {
+      graphRef.current.centerAt(0, 0, 1000);
+      graphRef.current.zoom(1, 1000);
+    }
+  };
+
   return (
-    <div className="w-full h-full ">
+    <div className="w-full h-full relative">
+      {/* Reset button */}
+      <button
+        onClick={handleReset}
+        className="absolute top-4 left-4 z-10 px-4 py-2 bg-white bg-opacity-80 text-gray-800 rounded-md shadow-md hover:bg-opacity-100 transition-all duration-200 font-medium"
+      >
+        Reset View
+      </button>
+
       <ForceGraph2D
         graphData={graphData}
         backgroundColor="transparent"
@@ -175,7 +195,7 @@ export default function Page() {
         // link color with opacity
         linkColor={(link: any) => {
           // Define base colors for links
-          const baseColor = "#888888"; // Default color
+          const baseColor = "#a3b4bd"; // Default color
 
           // If no node is selected, use normal opacity
           if (!selectedNode) {
@@ -190,11 +210,13 @@ export default function Page() {
           return baseColor; // Original color for connected links
         }}
         // Add directional arrows to links
-        linkDirectionalArrowLength={(link: any) => 5 + link.value / 100}
+        // linkDirectionalArrowLength={(link: any) =>
+        //   selectedNode && isLinkConnected(link) ? 5 : 0
+        // }
         // 箭頭顏色
-        linkDirectionalArrowColor={() => "rgba(50, 50, 50, 0.8)"}
+        // linkDirectionalArrowColor={() => "#ffffff"}
         // 箭頭位置 (0: start, 1: end)
-        linkDirectionalArrowRelPos={0.5}
+        linkDirectionalArrowRelPos={0.7}
         // 箭頭粒子
         linkDirectionalParticles={(link: any) =>
           selectedNode && isLinkConnected(link) ? 3 : 0
@@ -202,9 +224,9 @@ export default function Page() {
         // 箭頭粒子速度
         linkDirectionalParticleSpeed={(link: any) => link.value / 5000}
         // 箭頭粒子寬度
-        linkDirectionalParticleWidth={(link: any) => link.value / 10}
+        linkDirectionalParticleWidth={4}
         // 箭頭粒子顏色
-        linkDirectionalParticleColor={() => "white"}
+        linkDirectionalParticleColor={() => "#768d9a"}
         /*
 
 
