@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useRef } from "react";
 import dynamic from "next/dynamic";
+import { graphData } from "./data";
+import { colos } from "./data";
 
 // Dynamically import ForceGraph2D with ssr disabled
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
@@ -23,48 +25,8 @@ export default function Page() {
       // Center on node position with 1000ms transition
       graphRef.current.centerAt(node.x, node.y, 1000);
       // Zoom to level 3 with 2000ms transition
-      graphRef.current.zoom(3, 1000);
+      graphRef.current.zoom(2, 1000);
     }
-  };
-
-  const graphData = {
-    nodes: [
-      { id: "1", title: "Node 1", value: 1 },
-      { id: "2", title: "Node 2", value: 2 },
-      { id: "3", title: "Node 3", value: 3 },
-      { id: "4", title: "Node 4", value: 4 },
-      { id: "5", title: "Node 5", value: 5 },
-      { id: "6", title: "Node 6", value: 6 },
-      { id: "7", title: "Node 7", value: 7 },
-      { id: "8", title: "Node 8", value: 8 },
-      { id: "9", title: "Node 9", value: 9 },
-      { id: "10", title: "Node 10", value: 10 },
-      { id: "11", title: "Node 11", value: 11 },
-      { id: "12", title: "Node 12", value: 12 },
-      { id: "13", title: "Node 13", value: 13 },
-      { id: "14", title: "Node 14", value: 14 },
-      { id: "15", title: "Node 15", value: 15 },
-      { id: "16", title: "Node 16", value: 16 },
-    ],
-    links: [
-      { source: "1", target: "2", value: 5, description: "Link 1-2" },
-      { source: "2", target: "3", value: 10, description: "Link 2-3" },
-      { source: "3", target: "4", value: 15, description: "Link 3-4" },
-      { source: "4", target: "5", value: 20, description: "Link 4-5" },
-      { source: "5", target: "1", value: 25, description: "Link 5-1" },
-      { source: "6", target: "7", value: 30, description: "Link 6-7" },
-      { source: "7", target: "8", value: 35, description: "Link 7-8" },
-      { source: "8", target: "9", value: 40, description: "Link 8-9" },
-      { source: "9", target: "10", value: 45, description: "Link 9-10" },
-      { source: "10", target: "6", value: 50, description: "Link 10-6" },
-      { source: "1", target: "6", value: 55, description: "Link 1-6" },
-      { source: "11", target: "12", value: 55, description: "Link 11-12" },
-      { source: "12", target: "13", value: 55, description: "Link 12-13" },
-      { source: "13", target: "14", value: 55, description: "Link 13-14" },
-      { source: "14", target: "15", value: 55, description: "Link 14-15" },
-      { source: "15", target: "16", value: 55, description: "Link 15-16" },
-      { source: "16", target: "11", value: 55, description: "Link 16-11" },
-    ],
   };
 
   return (
@@ -87,15 +49,36 @@ export default function Page() {
         // hover show the title
         nodeLabel="title"
         // val to set node size
-        nodeVal={(node) => node.value}
+        nodeVal={(node) => node.value / 4}
         // val to set node visibility: boolean
         // nodeVisibility={(node) => node.value > 5}
         // node color
-        // nodeColor={(node) =>
-        //   node.value > 4 ? "purple" : node.value > 2 ? "pink" : "blue"
-        // }
+        nodeColor={(node) => {
+          // Set colors based on node type
+          if (node.type === "department") {
+            return colos[0];
+          } else if (node.type === "fruit") {
+            return colos[1];
+          } else if (node.type === "3c") {
+            return colos[2];
+          } else if (node.type === "sports") {
+            return colos[3];
+          } else if (node.type === "windows") {
+            return colos[4];
+          } else if (node.type === "apple") {
+            return colos[5];
+          } else if (node.type === "coffee") {
+            return colos[6];
+          } else if (node.type === "orange") {
+            return colos[7];
+          } else if (node.type === "banana") {
+            return colos[8];
+          } else {
+            return "#666666"; // Default color
+          }
+        }}
         // randomly set node color by value, Only affects nodes without a color attribute.
-        nodeAutoColorBy="value"
+        // nodeAutoColorBy="value"
         /*
         
 
@@ -136,7 +119,7 @@ export default function Page() {
         // 箭頭粒子寬度
         linkDirectionalParticleWidth={(link) => link.value / 10}
         // 箭頭粒子顏色
-        linkDirectionalParticleColor={(link) => "rgba(50, 50, 50, 0.8)"}
+        linkDirectionalParticleColor={(link) => "gray"}
         /*
 
 
