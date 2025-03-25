@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { graphData } from "./data";
 import { colos } from "./data";
@@ -18,14 +18,50 @@ const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
 export default function Page() {
   // Store reference to the graph
   const graphRef = useRef<any>(null);
+  // Add state to track selected node
+  const [selectedNode, setSelectedNode] = useState<string | null>(null);
 
-  // Handle node click to center and zoom
+  // Function to check if a node is connected to the selected node
+  const isNodeConnected = (nodeId: string) => {
+    if (!selectedNode) return false;
+
+    // Check if this node is connected to the selected node via any link
+    return graphData.links.some((link: any) => {
+      const sourceId =
+        typeof link.source === "object" ? link.source.id : link.source;
+      const targetId =
+        typeof link.target === "object" ? link.target.id : link.target;
+
+      return (
+        (sourceId === selectedNode && targetId === nodeId) ||
+        (targetId === selectedNode && sourceId === nodeId)
+      );
+    });
+  };
+
+  // Function to check if a link is connected to the selected node
+  const isLinkConnected = (link: any) => {
+    if (!selectedNode) return false;
+
+    const sourceId =
+      typeof link.source === "object" ? link.source.id : link.source;
+    const targetId =
+      typeof link.target === "object" ? link.target.id : link.target;
+
+    // Check if this link is connected to the selected node
+    return sourceId === selectedNode || targetId === selectedNode;
+  };
+
+  // Handle node click to center, zoom, and highlight
   const handleNodeClick = (node: any) => {
-    if (graphRef.current) {
+    if (graphRef.current && node.x !== undefined && node.y !== undefined) {
       // Center on node position with 1000ms transition
       graphRef.current.centerAt(node.x, node.y, 1000);
-      // Zoom to level 3 with 2000ms transition
+      // Zoom to level 2 with 1000ms transition
       graphRef.current.zoom(2, 1000);
+
+      // Toggle selection: if clicking the already selected node, deselect it
+      setSelectedNode(selectedNode === node.id ? null : node.id);
     }
   };
 
@@ -33,9 +69,6 @@ export default function Page() {
     <div className="w-full h-full ">
       <ForceGraph2D
         graphData={graphData}
-        // node move area, default full screen
-        // width={window.innerWidth}
-        // height={window.innerHeight}
         backgroundColor="transparent"
         /*
 
@@ -49,36 +82,73 @@ export default function Page() {
         // hover show the title
         nodeLabel="title"
         // val to set node size
-        nodeVal={(node) => node.value / 4}
-        // val to set node visibility: boolean
-        // nodeVisibility={(node) => node.value > 5}
-        // node color
-        nodeColor={(node) => {
+        nodeVal={(node: any) => node.value / 4}
+        // node color with opacity
+        nodeColor={(node: any) => {
           // Set colors based on node type
+          let color;
+
           if (node.type === "department") {
-            return colos[0];
+            color = colos[0];
           } else if (node.type === "fruit") {
-            return colos[1];
+            color = colos[1];
           } else if (node.type === "3c") {
-            return colos[2];
+            color = colos[2];
           } else if (node.type === "sports") {
-            return colos[3];
+            color = colos[3];
           } else if (node.type === "windows") {
-            return colos[4];
+            color = colos[4];
           } else if (node.type === "apple") {
-            return colos[5];
+            color = colos[5];
           } else if (node.type === "coffee") {
-            return colos[6];
+            color = colos[6];
           } else if (node.type === "orange") {
-            return colos[7];
+            color = colos[7];
           } else if (node.type === "banana") {
-            return colos[8];
+            color = colos[8];
           } else {
-            return "#666666"; // Default color
+            color = "#666666"; // Default color
           }
+
+          // Apply opacity based on selection
+          if (!selectedNode) {
+            return color; // Full opacity when no selection
+          }
+
+          // Apply opacity for nodes that aren't selected or connected
+          if (node.id !== selectedNode && !isNodeConnected(node.id)) {
+            // Parse color to rgba with reduced opacity
+            if (color.startsWith("#")) {
+              const r = parseInt(color.slice(1, 3), 16);
+              const g = parseInt(color.slice(3, 5), 16);
+              const b = parseInt(color.slice(5, 7), 16);
+              return `rgba(${r}, ${g}, ${b}, 0.2)`;
+            }
+            return color; // Fallback
+          }
+
+          return color; // Selected or connected nodes keep original color
         }}
-        // randomly set node color by value, Only affects nodes without a color attribute.
-        // nodeAutoColorBy="value"
+        // Use canvasObjectMode to overlay custom rendering
+        nodeCanvasObjectMode={() => "before"}
+        // Add a highlight for the selected node
+        nodeCanvasObject={(node: any, ctx, globalScale) => {
+          // If this is the selected node, draw a highlight ring
+          if (selectedNode && node.id === selectedNode) {
+            ctx.beginPath();
+            ctx.arc(
+              node.x || 0,
+              node.y || 0,
+              4 * (node.value / 4) + 2,
+              0,
+              2 * Math.PI
+            );
+            ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+            ctx.fill();
+          }
+
+          return false; // Return false to continue with default node rendering
+        }}
         /*
         
 
@@ -87,39 +157,54 @@ export default function Page() {
 
         */
         // 定義連結標籤
-        linkLabel={(link) =>
-          `${link.source} → ${link.target}: ${link.description}`
+        linkLabel={(link: any) =>
+          `${
+            typeof link.source === "object" ? link.source.id : link.source
+          } → ${
+            typeof link.target === "object" ? link.target.id : link.target
+          }: ${link.description}`
         }
-        // 寬度
-        // linkWidth={(link) => link.value / 100}
-        // 顏色
-        // linkColor={() => "rgba(0, 127, 255, 0.5)"}
-        // 顏色
-        linkAutoColorBy="value"
-        // link 是否顯示
-        // linkVisibility={(link) => {
-        //   // Make sure we're returning a proper boolean
-        //   const isVisible = typeof link.value === "number" && link.value > 20;
-        //   return isVisible;
-        // }}
-        // link line dash (array of line, gap lengths)
-        // linkLineDash={[10, 1]}
-        // link 曲線
-        // linkCurvature={(link) => link.value / 10}
+        // link width based on visibility
+        linkWidth={(link: any) => {
+          // Make selected links thicker
+          if (selectedNode && isLinkConnected(link)) {
+            return 2; // Thicker for connected links
+          }
+          return 1; // Default width
+        }}
+        // link color with opacity
+        linkColor={(link: any) => {
+          // Define base colors for links
+          const baseColor = "#888888"; // Default color
+
+          // If no node is selected, use normal opacity
+          if (!selectedNode) {
+            return baseColor;
+          }
+
+          // Apply opacity for unconnected links
+          if (!isLinkConnected(link)) {
+            return "rgba(136, 136, 136, 0.1)"; // Faded gray for unselected links
+          }
+
+          return baseColor; // Original color for connected links
+        }}
         // Add directional arrows to links
-        linkDirectionalArrowLength={(link) => 5 + link.value / 100}
+        linkDirectionalArrowLength={(link: any) => 5 + link.value / 100}
         // 箭頭顏色
         linkDirectionalArrowColor={() => "rgba(50, 50, 50, 0.8)"}
         // 箭頭位置 (0: start, 1: end)
         linkDirectionalArrowRelPos={0.5}
         // 箭頭粒子
-        linkDirectionalParticles={2}
+        linkDirectionalParticles={(link: any) =>
+          selectedNode && isLinkConnected(link) ? 3 : 0
+        }
         // 箭頭粒子速度
-        linkDirectionalParticleSpeed={(link) => link.value / 5000}
+        linkDirectionalParticleSpeed={(link: any) => link.value / 5000}
         // 箭頭粒子寬度
-        linkDirectionalParticleWidth={(link) => link.value / 10}
+        linkDirectionalParticleWidth={(link: any) => link.value / 10}
         // 箭頭粒子顏色
-        linkDirectionalParticleColor={(link) => "gray"}
+        linkDirectionalParticleColor={() => "white"}
         /*
 
 
@@ -134,8 +219,8 @@ export default function Page() {
         // 最大縮放
         maxZoom={10}
         // on zoom action
-        onZoom={(event) => {
-          console.log("asdad");
+        onZoom={() => {
+          console.log("zoom action");
         }}
         /*
 
