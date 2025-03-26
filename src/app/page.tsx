@@ -183,10 +183,8 @@ export default function Page() {
         newSelectedTypes.add(type);
       }
 
-      // If any type is selected, clear node selection
-      if (newSelectedTypes.size > 0) {
-        setSelectedNode(null);
-      }
+      // No longer clear node selection when selecting a type
+      // This allows users to maintain node selection while filtering by type
 
       // Focus on relevant nodes when changing type selection
       if (graphRef.current) {
@@ -224,6 +222,35 @@ export default function Page() {
   // Helper function to check if a node type is selected
   const isNodeTypeSelected = (type: string) => {
     return selectedNodeTypes.has(type);
+  };
+
+  // Helper to check if a node should be displayed based on type selection and node selection
+  const isNodeVisible = (node: any) => {
+    const nodeType = node.entity?.type;
+
+    // If no type filtering is active, all nodes are potentially visible
+    if (selectedNodeTypes.size === 0) {
+      return true;
+    }
+
+    // If type filtering is active, node must match one of the selected types
+    return selectedNodeTypes.has(nodeType);
+  };
+
+  // Helper to check if a node should be highlighted (full opacity)
+  const isNodeHighlighted = (node: any) => {
+    // Always highlight the selected node
+    if (selectedNode === node.id) {
+      return true;
+    }
+
+    // If node selection is active, highlight connected nodes
+    if (selectedNode && isNodeConnected(node.id)) {
+      return true;
+    }
+
+    // If no node is selected, all visible nodes are highlighted
+    return !selectedNode;
   };
 
   return (
@@ -317,17 +344,20 @@ export default function Page() {
         nodeLabel="title"
         // val to set node size
         nodeVal={(node: any) => {
-          // If a type is selected and this node is not of that type, set size to 0 to hide it
-          if (
-            selectedNodeTypes.size > 0 &&
-            !selectedNodeTypes.has(node.entity?.type)
-          ) {
+          // If the node shouldn't be visible due to type filtering, hide it
+          if (!isNodeVisible(node)) {
             return 0; // Make the node invisible
           }
-          // Make nodes of selected type slightly larger
-          if (selectedNodeTypes.has(node.entity?.type)) {
-            return node.degree * 2.5; // Increase size for selected type
+
+          // Make selected node and nodes of selected type slightly larger
+          if (
+            node.id === selectedNode ||
+            (selectedNodeTypes.size > 0 &&
+              selectedNodeTypes.has(node.entity?.type))
+          ) {
+            return node.degree * 2.5; // Increase size for selected node and selected types
           }
+
           return node.degree * 2;
         }}
         // node color with opacity
@@ -358,31 +388,20 @@ export default function Page() {
             color = "#666666"; // Default color
           }
 
-          // Check for type filtering with multi-selection
-          if (selectedNodeTypes.size > 0) {
-            // If node types are selected, hide nodes of other types
-            if (!selectedNodeTypes.has(nodeType)) {
-              return "rgba(0,0,0,0)"; // Fully transparent (hidden)
-            }
-            // Nodes of selected types keep full opacity
-            return color;
+          // First check if node should be visible based on type filtering
+          if (!isNodeVisible(node)) {
+            return "rgba(0,0,0,0)"; // Fully transparent (hidden)
           }
 
-          // If no type is selected, apply node selection logic
-          if (!selectedNode) {
-            return color; // Full opacity when no selection
-          }
-
-          // Apply opacity for nodes that aren't selected or connected
-          if (node.id !== selectedNode && !isNodeConnected(node.id)) {
-            // Parse color to rgba with reduced opacity
+          // Now apply highlighting based on node selection
+          if (!isNodeHighlighted(node)) {
+            // Parse color to rgba with reduced opacity for non-highlighted nodes
             if (color.startsWith("#")) {
               const r = parseInt(color.slice(1, 3), 16);
               const g = parseInt(color.slice(3, 5), 16);
               const b = parseInt(color.slice(5, 7), 16);
               return `rgba(${r}, ${g}, ${b}, 0.2)`;
             }
-            return color; // Fallback
           }
 
           return color; // Selected or connected nodes keep original color
@@ -391,11 +410,8 @@ export default function Page() {
         nodeCanvasObjectMode={() => "before"}
         // Add a highlight for the selected node
         nodeCanvasObject={(node: any, ctx, globalScale) => {
-          // If a type is selected and this node is not of selected types, skip rendering
-          if (
-            selectedNodeTypes.size > 0 &&
-            !selectedNodeTypes.has(node.entity?.type)
-          ) {
+          // If the node shouldn't be visible due to type filtering, skip rendering
+          if (!isNodeVisible(node)) {
             return false;
           }
 
@@ -441,20 +457,22 @@ export default function Page() {
           // Define base colors for links
           const baseColor = "#a3b4bd"; // Default color
 
-          // If node types are selected, check if this link connects nodes of those types
+          const sourceNode =
+            typeof link.source === "object"
+              ? link.source
+              : graphData.nodes.find((n: any) => n.id === link.source);
+          const targetNode =
+            typeof link.target === "object"
+              ? link.target
+              : graphData.nodes.find((n: any) => n.id === link.target);
+
+          const sourceType = sourceNode?.entity?.type;
+          const targetType = targetNode?.entity?.type;
+          const sourceId = sourceNode?.id;
+          const targetId = targetNode?.id;
+
+          // First check if link should be visible based on type filtering
           if (selectedNodeTypes.size > 0) {
-            const sourceNode =
-              typeof link.source === "object"
-                ? link.source
-                : graphData.nodes.find((n: any) => n.id === link.source);
-            const targetNode =
-              typeof link.target === "object"
-                ? link.target
-                : graphData.nodes.find((n: any) => n.id === link.target);
-
-            const sourceType = sourceNode?.entity?.type;
-            const targetType = targetNode?.entity?.type;
-
             // Only show links where BOTH nodes are of the selected types
             if (
               !selectedNodeTypes.has(sourceType) ||
@@ -462,51 +480,60 @@ export default function Page() {
             ) {
               return "rgba(0,0,0,0)"; // Fully transparent (hidden)
             }
-
-            // If both nodes are of selected types, show the link
-            return baseColor;
           }
 
-          // If no node type is selected, follow the regular node selection logic
-          if (!selectedNode) {
-            return baseColor;
+          // Now apply highlighting based on node selection
+          if (selectedNode) {
+            // Show links connected to the selected node with full opacity
+            if (sourceId === selectedNode || targetId === selectedNode) {
+              return baseColor;
+            }
+            // Fade other links
+            return "rgba(136, 136, 136, 0.1)";
           }
 
-          // Apply opacity for unconnected links
-          if (!isLinkConnected(link)) {
-            return "rgba(136, 136, 136, 0.1)"; // Faded gray for unselected links
-          }
-
-          return baseColor; // Original color for connected links
+          return baseColor; // No node selected, use default color
         }}
         // 箭頭粒子
         linkDirectionalParticles={(link: any) => {
-          // Show particles for links of selected node types
+          const sourceNode =
+            typeof link.source === "object"
+              ? link.source
+              : graphData.nodes.find((n: any) => n.id === link.source);
+          const targetNode =
+            typeof link.target === "object"
+              ? link.target
+              : graphData.nodes.find((n: any) => n.id === link.target);
+
+          const sourceType = sourceNode?.entity?.type;
+          const targetType = targetNode?.entity?.type;
+          const sourceId = sourceNode?.id;
+          const targetId = targetNode?.id;
+
+          // First check type filtering
           if (selectedNodeTypes.size > 0) {
-            const sourceNode =
-              typeof link.source === "object"
-                ? link.source
-                : graphData.nodes.find((n: any) => n.id === link.source);
-            const targetNode =
-              typeof link.target === "object"
-                ? link.target
-                : graphData.nodes.find((n: any) => n.id === link.target);
-
-            const sourceType = sourceNode?.entity?.type;
-            const targetType = targetNode?.entity?.type;
-
             // Only show particles for links where both nodes are of the selected types
             if (
-              selectedNodeTypes.has(sourceType) &&
-              selectedNodeTypes.has(targetType)
+              !selectedNodeTypes.has(sourceType) ||
+              !selectedNodeTypes.has(targetType)
             ) {
-              return 1;
+              return 0;
             }
-            return 0;
           }
 
-          // Otherwise follow the regular node selection logic
-          return selectedNode && isLinkConnected(link) ? 1 : 0;
+          // Then check node selection
+          if (selectedNode) {
+            return sourceId === selectedNode || targetId === selectedNode
+              ? 1
+              : 0;
+          }
+
+          // If node types are selected but no node is selected, show particles on all visible links
+          if (selectedNodeTypes.size > 0) {
+            return 1;
+          }
+
+          return 0; // Default case
         }}
         // 箭頭粒子速度
         linkDirectionalParticleSpeed={() => 0.01}
