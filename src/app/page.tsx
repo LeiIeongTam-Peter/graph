@@ -102,29 +102,30 @@ export default function Page() {
         // hover show the title
         nodeLabel="title"
         // val to set node size
-        nodeVal={(node: any) => node.value / 4}
+        nodeVal={(node: any) => node.degree * 2}
         // node color with opacity
         nodeColor={(node: any) => {
           // Set colors based on node type
           let color;
+          const nodeType = node.entity?.type;
 
-          if (node.type === "department") {
+          if (nodeType === "department") {
             color = colos[0];
-          } else if (node.type === "fruit") {
+          } else if (nodeType === "fruit") {
             color = colos[1];
-          } else if (node.type === "3c") {
+          } else if (nodeType === "3c") {
             color = colos[2];
-          } else if (node.type === "sports") {
+          } else if (nodeType === "sports") {
             color = colos[3];
-          } else if (node.type === "windows") {
+          } else if (nodeType === "windows") {
             color = colos[4];
-          } else if (node.type === "apple") {
+          } else if (nodeType === "apple") {
             color = colos[5];
-          } else if (node.type === "coffee") {
+          } else if (nodeType === "coffee") {
             color = colos[6];
-          } else if (node.type === "orange") {
+          } else if (nodeType === "orange") {
             color = colos[7];
-          } else if (node.type === "banana") {
+          } else if (nodeType === "banana") {
             color = colos[8];
           } else {
             color = "#666666"; // Default color
@@ -159,7 +160,7 @@ export default function Page() {
             ctx.arc(
               node.x || 0,
               node.y || 0,
-              4 * (node.value / 4) + 2,
+              4 * (node.degree * 2) + 2,
               0,
               2 * Math.PI
             );
@@ -177,21 +178,21 @@ export default function Page() {
 
         */
         // 定義連結標籤
-        linkLabel={(link: any) =>
-          `${
-            typeof link.source === "object" ? link.source.id : link.source
-          } → ${
-            typeof link.target === "object" ? link.target.id : link.target
-          }: ${link.description}`
-        }
+        // linkLabel={(link: any) =>
+        //   `${
+        //     typeof link.source === "object" ? link.source.id : link.source
+        //   } → ${
+        //     typeof link.target === "object" ? link.target.id : link.target
+        //   }${link.graph ? ` (${link.graph})` : ""}`
+        // }
         // link width based on visibility
-        linkWidth={(link: any) => {
-          // Make selected links thicker
-          if (selectedNode && isLinkConnected(link)) {
-            return 2; // Thicker for connected links
-          }
-          return 1; // Default width
-        }}
+        // linkWidth={(link: any) => {
+        //   // Make selected links thicker
+        //   if (selectedNode && isLinkConnected(link)) {
+        //     return 2; // Thicker for connected links
+        //   }
+        //   return 1; // Default width
+        // }}
         // link color with opacity
         linkColor={(link: any) => {
           // Define base colors for links
@@ -214,17 +215,17 @@ export default function Page() {
         //   selectedNode && isLinkConnected(link) ? 5 : 0
         // }
         // 箭頭顏色
-        // linkDirectionalArrowColor={() => "#ffffff"}
+        // linkDirectionalArrowColor={() => "gray"}
         // 箭頭位置 (0: start, 1: end)
-        linkDirectionalArrowRelPos={0.7}
+        // linkDirectionalArrowRelPos={0.7}
         // 箭頭粒子
         linkDirectionalParticles={(link: any) =>
-          selectedNode && isLinkConnected(link) ? 3 : 0
+          selectedNode && isLinkConnected(link) ? 2 : 0
         }
         // 箭頭粒子速度
-        linkDirectionalParticleSpeed={(link: any) => link.value / 5000}
+        linkDirectionalParticleSpeed={() => 0.02}
         // 箭頭粒子寬度
-        linkDirectionalParticleWidth={4}
+        linkDirectionalParticleWidth={6}
         // 箭頭粒子顏色
         linkDirectionalParticleColor={() => "#768d9a"}
         /*
@@ -259,6 +260,19 @@ export default function Page() {
         onNodeHover={(node) => {
           console.log(node);
         }}
+        // Performance optimizations for large graph
+        cooldownTicks={500}
+        cooldownTime={25000}
+        d3AlphaDecay={0.01}
+        d3VelocityDecay={0.25}
+        warmupTicks={200} // More ticks for initial layout of 2000 nodes
+        // Enable tree-like visualization
+        // dagMode="radialout"
+        dagLevelDistance={35}
+        // Adjust force parameters for tree structure
+        // linkDistance={40} // Longer distance between nodes
+        // nodeStrength={-150} // Stronger repulsive force
+        // linkStrength={0.8} // Stronger link force
       />
     </div>
   );
