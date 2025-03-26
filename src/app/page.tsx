@@ -52,16 +52,91 @@ export default function Page() {
     return sourceId === selectedNode || targetId === selectedNode;
   };
 
+  // Function to calculate the appropriate zoom level based on node connections
+  const calculateZoomLevel = (nodeId: string) => {
+    // Get all connected nodes
+    const connectedNodes: any[] = [];
+    const directConnections = graphData.links.filter((link: any) => {
+      const sourceId =
+        typeof link.source === "object" ? link.source.id : link.source;
+      const targetId =
+        typeof link.target === "object" ? link.target.id : link.target;
+
+      return sourceId === nodeId || targetId === nodeId;
+    });
+
+    // Find the connected node objects
+    directConnections.forEach((link: any) => {
+      const sourceId =
+        typeof link.source === "object" ? link.source.id : link.source;
+      const targetId =
+        typeof link.target === "object" ? link.target.id : link.target;
+
+      // Add the node that isn't the selected one
+      const connectedNodeId = sourceId === nodeId ? targetId : sourceId;
+      const connectedNode = graphData.nodes.find(
+        (n: any) => n.id === connectedNodeId
+      );
+
+      if (connectedNode) {
+        connectedNodes.push(connectedNode);
+      }
+    });
+
+    // Default zoom level
+    if (connectedNodes.length === 0) return 3;
+
+    // Calculate distances from the clicked node to all connected nodes
+    const clickedNodeObj = graphData.nodes.find((n: any) => n.id === nodeId);
+    if (
+      !clickedNodeObj ||
+      clickedNodeObj.x === undefined ||
+      clickedNodeObj.y === undefined
+    )
+      return 3;
+
+    // At this point we know x and y are defined
+    const nodeX = clickedNodeObj.x as number;
+    const nodeY = clickedNodeObj.y as number;
+
+    let maxDistance = 0;
+    connectedNodes.forEach((node: any) => {
+      if (node.x !== undefined && node.y !== undefined) {
+        const distance = Math.sqrt(
+          Math.pow(nodeX - node.x, 2) + Math.pow(nodeY - node.y, 2)
+        );
+        maxDistance = Math.max(maxDistance, distance);
+      }
+    });
+
+    // Calculate zoom level inversely proportional to the max distance
+    // More distance = less zoom, to fit all nodes in view
+    // Use a base zoom level of 7 for very close nodes
+    // Reduced the divisor factor to make zoom closer
+    const zoomLevel = Math.max(0.7, Math.min(6, 150 / (maxDistance + 20)));
+
+    return zoomLevel;
+  };
+
   // Handle node click to center, zoom, and highlight
   const handleNodeClick = (node: any) => {
     if (graphRef.current && node.x !== undefined && node.y !== undefined) {
+      // Toggle selection: if clicking the already selected node, deselect it
+      const newSelectedNode = selectedNode === node.id ? null : node.id;
+      setSelectedNode(newSelectedNode);
+
       // Center on node position with 1000ms transition
       graphRef.current.centerAt(node.x, node.y, 1000);
-      // Zoom to level 3 with 1000ms transition
-      graphRef.current.zoom(3, 1000);
 
-      // Toggle selection: if clicking the already selected node, deselect it
-      setSelectedNode(selectedNode === node.id ? null : node.id);
+      if (newSelectedNode) {
+        // Calculate dynamic zoom level based on node connections
+        const zoomLevel = calculateZoomLevel(node.id);
+        // Zoom with 1000ms transition
+        graphRef.current.zoom(zoomLevel, 1000);
+      } else {
+        // If deselecting, zoom out to default
+        graphRef.current.zoom(1, 1000);
+      }
     }
   };
 

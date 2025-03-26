@@ -22,17 +22,17 @@ const createCommunityNodes = (
   nodeType: string,
   namePrefix: string
 ) => {
-  const startId = (communityIndex - 1) * 100 + 1;
+  const startId = (communityIndex - 1) * 25 + 1;
 
-  return Array.from({ length: 100 }, (_, i) => ({
+  return Array.from({ length: 25 }, (_, i) => ({
     entity: {
       type: nodeType,
     },
     id: String(startId + i),
     title: `${namePrefix} ${i + 1}`,
     community: communityIndex,
-    level: i < 5 ? 3 : i < 20 ? 2 : 1, // Top nodes have higher level
-    degree: i < 5 ? 5 : i < 20 ? 3 : Math.floor(Math.random() * 2) + 1, // Top nodes have higher degree
+    level: i < 5 ? 3 : i < 10 ? 2 : 1, // Top nodes have higher level
+    degree: i < 5 ? 5 : i < 10 ? 3 : Math.floor(Math.random() * 2) + 1, // Top nodes have higher degree
   }));
 };
 
@@ -45,16 +45,16 @@ const generateCrossCommunityLinks = (
 ) => {
   // Only connect from top-level nodes (first 5 nodes) of source community
   const sourceIds = Array.from({ length: 5 }, (_, i) =>
-    String((sourceComm - 1) * 100 + i + 1)
+    String((sourceComm - 1) * 25 + i + 1)
   );
 
   // Connect to random nodes in target community
-  const targetStart = (targetComm - 1) * 100 + 1;
+  const targetStart = (targetComm - 1) * 25 + 1;
 
   return Array.from({ length: count }, (_, i) => ({
     id: `${baseId}_${i + 1}`,
     source: sourceIds[i % sourceIds.length], // Distribute connections among top nodes
-    target: String(Math.floor(Math.random() * 100) + targetStart),
+    target: String(Math.floor(Math.random() * 25) + targetStart), // Random node in target community (between 1-25)
     graph: `cross_${sourceComm}_${targetComm}`,
   }));
 };
@@ -107,7 +107,7 @@ const communityNames = [
   "Segment",
 ];
 
-// Create 2000 nodes across 20 communities
+// Create 500 nodes across 20 communities
 export const graphData: { nodes: Node[]; links: Link[] } = {
   nodes: [
     // Generate nodes for all 20 communities
@@ -119,7 +119,7 @@ export const graphData: { nodes: Node[]; links: Link[] } = {
   links: [
     // Each community gets a tree structure
     ...Array.from({ length: 20 }, (_, communityIndex: number) => {
-      const startId = communityIndex * 100 + 1;
+      const startId = communityIndex * 25 + 1;
       const links = [];
 
       // Track which nodes have been connected
@@ -131,8 +131,8 @@ export const graphData: { nodes: Node[]; links: Link[] } = {
         const rootId = String(rootNodeId);
         connectedNodes.add(rootNodeId);
 
-        // Each root connects to 3-4 level 2 nodes
-        const level2Count = 3 + (rootIdx % 2); // 3 or 4 children
+        // Each root connects to 2-3 level 2 nodes
+        const level2Count = 2 + (rootIdx % 2); // 2 or 3 children
         const level2StartId = startId + 5 + rootIdx * level2Count;
 
         // Add connections from root to level 2 nodes
@@ -151,16 +151,16 @@ export const graphData: { nodes: Node[]; links: Link[] } = {
 
         links.push(...level2Links);
 
-        // Level 2: Each level 2 node connects to 3-5 level 3 nodes
+        // Level 2: Each level 2 node connects to 2-3 level 3 nodes
         for (let l2Idx = 0; l2Idx < level2Count; l2Idx++) {
           const parentNodeId = level2StartId + l2Idx;
           const parentId = String(parentNodeId);
-          const level3Count = 3 + Math.floor(Math.random() * 3); // 3-5 children
+          const level3Count = 2 + Math.floor(Math.random() * 2); // 2-3 children
           const level3StartId =
-            startId + 20 + rootIdx * 15 + l2Idx * level3Count;
+            startId + 15 + rootIdx * 5 + l2Idx * level3Count;
 
           // Ensure we don't exceed the community's node range
-          if (level3StartId + level3Count <= startId + 99) {
+          if (level3StartId + level3Count <= startId + 24) {
             const level3Links = generateTreeLinks(
               parentId,
               level3StartId,
@@ -190,7 +190,7 @@ export const graphData: { nodes: Node[]; links: Link[] } = {
       }
 
       // Connect any remaining isolated nodes to the closest root or level 2 node
-      for (let nodeId = startId; nodeId < startId + 100; nodeId++) {
+      for (let nodeId = startId; nodeId < startId + 25; nodeId++) {
         if (!connectedNodes.has(nodeId)) {
           // Connect to a random root node
           const rootNodeIdx = Math.floor(Math.random() * 5);
@@ -252,9 +252,9 @@ export const graphData: { nodes: Node[]; links: Link[] } = {
       // Connect specific important nodes (usually from the top of each community)
       return {
         id: `link_important_${i + 1}`,
-        source: String((sourceComm - 1) * 100 + (i % 5) + 1), // Top 5 nodes
+        source: String((sourceComm - 1) * 25 + (i % 5) + 1), // Top 5 nodes
         target: String(
-          (targetComm - 1) * 100 + Math.floor(Math.random() * 10) + 1
+          (targetComm - 1) * 25 + Math.floor(Math.random() * 10) + 1
         ), // Top 10 nodes
         graph: "important",
       };
@@ -271,9 +271,9 @@ export const graphData: { nodes: Node[]; links: Link[] } = {
         if (targetComm !== sourceComm) {
           // Connect a random node from each community (including leaf nodes)
           const sourceNode =
-            (sourceComm - 1) * 100 + Math.floor(Math.random() * 100) + 1;
+            (sourceComm - 1) * 25 + Math.floor(Math.random() * 25) + 1;
           const targetNode =
-            (targetComm - 1) * 100 + Math.floor(Math.random() * 100) + 1;
+            (targetComm - 1) * 25 + Math.floor(Math.random() * 25) + 1;
 
           links.push({
             id: `link_extra_${sourceComm}_${targetComm}_${j}`,
