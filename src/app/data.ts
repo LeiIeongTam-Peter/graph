@@ -289,7 +289,19 @@ export const graphData: { nodes: Node[]; links: Link[] } = {
   ],
 };
 
-export const colos = [
+export const types = [
+  "department",
+  "fruit",
+  "3c",
+  "sports",
+  "windows",
+  "apple",
+  "coffee",
+  "orange",
+  "banana",
+];
+
+export const colors = [
   "#f87171", // red-400 (department)
   "#fb923c", // orange-400 (fruit)
   "#fbbf24", // amber-400 (3c)

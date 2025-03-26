@@ -3,7 +3,8 @@
 import React, { useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { graphData } from "./data";
-import { colos } from "./data";
+import { colors } from "./data";
+import { types } from "./data";
 
 // Dynamically import ForceGraph2D with ssr disabled
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
@@ -20,6 +21,10 @@ export default function Page() {
   const graphRef = useRef<any>(null);
   // Add state to track selected node
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  // Add state to track if the legend is expanded
+  const [isLegendExpanded, setIsLegendExpanded] = useState<boolean>(true);
+  // Add state to track selected node type for filtering
+  const [selectedType, setSelectedType] = useState<string | null>(null);
 
   // Function to check if a node is connected to the selected node
   const isNodeConnected = (nodeId: string) => {
@@ -113,7 +118,7 @@ export default function Page() {
     // More distance = less zoom, to fit all nodes in view
     // Use a base zoom level of 7 for very close nodes
     // Reduced the divisor factor to make zoom closer
-    const zoomLevel = Math.max(0.7, Math.min(6, 150 / (maxDistance + 20)));
+    const zoomLevel = Math.max(1.5, Math.min(10, 300 / (maxDistance + 20)));
 
     return zoomLevel;
   };
@@ -145,10 +150,28 @@ export default function Page() {
     // Clear node selection
     setSelectedNode(null);
 
+    // Clear type filter
+    setSelectedType(null);
+
     // Reset zoom and center if graph is available
     if (graphRef.current) {
       graphRef.current.centerAt(0, 0, 1000);
-      graphRef.current.zoom(1, 1000);
+      graphRef.current.zoom(0.6, 1000);
+    }
+  };
+
+  // Handle type filter click in legend
+  const handleTypeClick = (type: string) => {
+    // Toggle selection: if clicking the already selected type, deselect it
+    setSelectedType(selectedType === type ? null : type);
+
+    // Clear node selection when changing type filter
+    setSelectedNode(null);
+
+    // Reset zoom to show all filtered nodes
+    if (graphRef.current) {
+      graphRef.current.centerAt(0, 0, 1000);
+      graphRef.current.zoom(0.4, 1000);
     }
   };
 
@@ -162,8 +185,86 @@ export default function Page() {
         Reset View
       </button>
 
+      {/* Color Legend Sheet */}
+      <div
+        className="absolute bottom-4 right-4 z-10 bg-white bg-opacity-90 rounded-md shadow-md overflow-hidden transition-all duration-300"
+        style={{
+          maxHeight: isLegendExpanded ? "300px" : "40px",
+          width: "200px",
+        }}
+      >
+        {/* Legend Header */}
+        <div
+          className="px-4 py-2 bg-gray-100 flex justify-between items-center cursor-pointer"
+          onClick={() => setIsLegendExpanded(!isLegendExpanded)}
+        >
+          <h3 className="font-medium text-gray-800">Node Types</h3>
+          <span className="text-gray-500">{isLegendExpanded ? "▼" : "▲"}</span>
+        </div>
+
+        {/* Legend Content */}
+        <div className="p-3">
+          <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
+            {types.map((type, index) => (
+              <div
+                key={type}
+                className={`flex items-center p-1 rounded hover:bg-gray-100 cursor-pointer ${
+                  selectedType === type ? "bg-gray-200" : ""
+                }`}
+                onClick={() => handleTypeClick(type)}
+              >
+                <div
+                  className="w-5 h-5 rounded-full mr-3 border border-gray-200"
+                  style={{ backgroundColor: colors[index] }}
+                ></div>
+                <span className="text-sm text-gray-700 capitalize">{type}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <ForceGraph2D
-        graphData={graphData}
+        graphData={
+          selectedType
+            ? {
+                nodes: graphData.nodes.filter((node: any) =>
+                  selectedType === "other"
+                    ? !types.includes(node.entity?.type) || !node.entity?.type
+                    : node.entity?.type === selectedType
+                ),
+                links: graphData.links.filter((link: any) => {
+                  // Keep links where both source and target match the filter
+                  const sourceNode =
+                    typeof link.source === "object"
+                      ? link.source
+                      : graphData.nodes.find((n: any) => n.id === link.source);
+
+                  const targetNode =
+                    typeof link.target === "object"
+                      ? link.target
+                      : graphData.nodes.find((n: any) => n.id === link.target);
+
+                  if (!sourceNode || !targetNode) return false;
+
+                  const sourceMatches =
+                    selectedType === "other"
+                      ? !types.includes(sourceNode.entity?.type) ||
+                        !sourceNode.entity?.type
+                      : sourceNode.entity?.type === selectedType;
+
+                  const targetMatches =
+                    selectedType === "other"
+                      ? !types.includes(targetNode.entity?.type) ||
+                        !targetNode.entity?.type
+                      : targetNode.entity?.type === selectedType;
+
+                  // Only show links where both nodes match the selected type
+                  return sourceMatches && targetMatches;
+                }),
+              }
+            : graphData
+        }
         backgroundColor="transparent"
         /*
 
@@ -185,23 +286,23 @@ export default function Page() {
           const nodeType = node.entity?.type;
 
           if (nodeType === "department") {
-            color = colos[0];
+            color = colors[0];
           } else if (nodeType === "fruit") {
-            color = colos[1];
+            color = colors[1];
           } else if (nodeType === "3c") {
-            color = colos[2];
+            color = colors[2];
           } else if (nodeType === "sports") {
-            color = colos[3];
+            color = colors[3];
           } else if (nodeType === "windows") {
-            color = colos[4];
+            color = colors[4];
           } else if (nodeType === "apple") {
-            color = colos[5];
+            color = colors[5];
           } else if (nodeType === "coffee") {
-            color = colos[6];
+            color = colors[6];
           } else if (nodeType === "orange") {
-            color = colos[7];
+            color = colors[7];
           } else if (nodeType === "banana") {
-            color = colos[8];
+            color = colors[8];
           } else {
             color = "#666666"; // Default color
           }
@@ -295,10 +396,10 @@ export default function Page() {
         // linkDirectionalArrowRelPos={0.7}
         // 箭頭粒子
         linkDirectionalParticles={(link: any) =>
-          selectedNode && isLinkConnected(link) ? 2 : 0
+          selectedNode && isLinkConnected(link) ? 1 : 0
         }
         // 箭頭粒子速度
-        linkDirectionalParticleSpeed={() => 0.02}
+        linkDirectionalParticleSpeed={() => 0.01}
         // 箭頭粒子寬度
         linkDirectionalParticleWidth={6}
         // 箭頭粒子顏色
