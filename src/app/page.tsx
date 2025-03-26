@@ -6,6 +6,17 @@ import { graphData } from "./data";
 import { colors } from "./data";
 import { types } from "./data";
 
+// Import ShadCN components
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronUp, Check, RotateCcw } from "lucide-react";
+
 // Dynamically import ForceGraph2D with ssr disabled
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
   ssr: false,
@@ -23,8 +34,10 @@ export default function Page() {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   // Add state to track if the legend is expanded
   const [isLegendExpanded, setIsLegendExpanded] = useState<boolean>(true);
-  // Add state to track selected node type
-  const [selectedNodeType, setSelectedNodeType] = useState<string | null>(null);
+  // Replace single type selection with multiple selections using Set
+  const [selectedNodeTypes, setSelectedNodeTypes] = useState<Set<string>>(
+    new Set()
+  );
 
   // Function to check if a node is connected to the selected node
   const isNodeConnected = (nodeId: string) => {
@@ -149,8 +162,8 @@ export default function Page() {
   const handleReset = () => {
     // Clear node selection
     setSelectedNode(null);
-    // Clear selected node type
-    setSelectedNodeType(null);
+    // Clear selected node types
+    setSelectedNodeTypes(new Set());
 
     // Reset zoom and center if graph is available
     if (graphRef.current) {
@@ -159,86 +172,133 @@ export default function Page() {
     }
   };
 
-  // Handle click on a node type in the legend
-  const handleNodeTypeClick = (type: string) => {
-    // Toggle selection: if clicking the already selected type, deselect it
-    setSelectedNodeType(selectedNodeType === type ? null : type);
+  // Handle checkbox toggle for a node type
+  const handleNodeTypeToggle = (type: string) => {
+    setSelectedNodeTypes((prevSelectedTypes) => {
+      const newSelectedTypes = new Set(prevSelectedTypes);
+      // Toggle the selection
+      if (newSelectedTypes.has(type)) {
+        newSelectedTypes.delete(type);
+      } else {
+        newSelectedTypes.add(type);
+      }
 
-    // Clear node selection when selecting a type
-    if (selectedNodeType !== type) {
-      setSelectedNode(null);
+      // If any type is selected, clear node selection
+      if (newSelectedTypes.size > 0) {
+        setSelectedNode(null);
+      }
 
-      // Find all nodes of this type
-      const nodesOfType = graphData.nodes.filter(
-        (node: any) => node.entity?.type === type
-      );
+      // Focus on relevant nodes when changing type selection
+      if (graphRef.current) {
+        // If we just added a type and it's the only type selected
+        if (newSelectedTypes.has(type) && newSelectedTypes.size === 1) {
+          // Find all nodes of this type
+          const nodesOfType = graphData.nodes.filter(
+            (node: any) => node.entity?.type === type
+          );
 
-      if (nodesOfType.length > 0 && graphRef.current) {
-        // Center the graph at the position of the first node of this type
-        const firstNode = nodesOfType[0];
-        if (firstNode.x !== undefined && firstNode.y !== undefined) {
-          graphRef.current.centerAt(firstNode.x, firstNode.y, 1000);
+          if (nodesOfType.length > 0) {
+            // Center the graph at the position of the first node of this type
+            const firstNode = nodesOfType[0];
+            if (firstNode.x !== undefined && firstNode.y !== undefined) {
+              graphRef.current.centerAt(firstNode.x, firstNode.y, 1000);
 
-          // Calculate appropriate zoom level based on the number and spread of nodes
-          const zoomLevel = Math.max(0.8, 3 - Math.log(nodesOfType.length) / 2);
-          graphRef.current.zoom(zoomLevel, 1000);
+              // Calculate appropriate zoom level based on the number and spread of nodes
+              const zoomLevel = Math.max(
+                0.8,
+                3 - Math.log(nodesOfType.length) / 2
+              );
+              graphRef.current.zoom(zoomLevel, 1000);
+            }
+          }
+        } else if (newSelectedTypes.size === 0) {
+          // If all types are deselected, reset view
+          graphRef.current.zoom(0.6, 1000);
         }
       }
-    } else {
-      // If deselecting, zoom out to default
-      if (graphRef.current) {
-        graphRef.current.zoom(0.6, 1000);
-      }
-    }
+
+      return newSelectedTypes;
+    });
+  };
+
+  // Helper function to check if a node type is selected
+  const isNodeTypeSelected = (type: string) => {
+    return selectedNodeTypes.has(type);
   };
 
   return (
     <div className="w-full h-full relative">
-      {/* Reset button */}
-      <button
+      {/* Reset button using ShadCN Button */}
+      <Button
         onClick={handleReset}
-        className="absolute top-4 left-4 z-10 px-4 py-2 bg-white bg-opacity-80 text-gray-800 rounded-md shadow-md hover:bg-opacity-100 transition-all duration-200 font-medium"
+        variant="outline"
+        size="sm"
+        className="absolute top-4 left-4 z-10 bg-white/90 hover:bg-white/100 transition-all duration-200 shadow-md"
       >
+        <RotateCcw className="h-4 w-4 mr-1" />
         Reset View
-      </button>
+      </Button>
 
-      {/* Color Legend Sheet */}
-      <div
-        className="absolute bottom-4 right-4 z-10 bg-white bg-opacity-90 rounded-md shadow-md overflow-hidden transition-all duration-300"
-        style={{
-          maxHeight: isLegendExpanded ? "300px" : "40px",
-          width: "200px",
-        }}
-      >
-        {/* Legend Header */}
-        <div
-          className="px-4 py-2 bg-gray-100 flex justify-between items-center cursor-pointer"
-          onClick={() => setIsLegendExpanded(!isLegendExpanded)}
+      {/* Color Legend Sheet using ShadCN Collapsible */}
+      <div className="absolute bottom-4 right-4 z-10 w-[220px]">
+        <Collapsible
+          open={isLegendExpanded}
+          onOpenChange={setIsLegendExpanded}
+          className="border rounded-md shadow-md bg-white bg-opacity-90"
         >
-          <h3 className="font-medium text-gray-800">Node Types</h3>
-          <span className="text-gray-500">{isLegendExpanded ? "▼" : "▲"}</span>
-        </div>
+          <CollapsibleTrigger className="flex w-full items-center justify-between p-4 group">
+            <h3 className="text-sm font-medium">Node Types</h3>
+            <div className="text-gray-500">
+              {isLegendExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
+              )}
+            </div>
+          </CollapsibleTrigger>
 
-        {/* Legend Content */}
-        <div className="p-3">
-          <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
-            {types.map((type, index) => (
-              <div
-                key={type}
-                className={`flex items-center p-1 rounded hover:bg-gray-100 cursor-pointer ${
-                  selectedNodeType === type ? "bg-gray-200" : ""
-                }`}
-                onClick={() => handleNodeTypeClick(type)}
-              >
-                <div
-                  className="w-5 h-5 rounded-full mr-3 border border-gray-200"
-                  style={{ backgroundColor: colors[index] }}
-                ></div>
-                <span className="text-sm text-gray-700 capitalize">{type}</span>
+          <CollapsibleContent className="px-4 pb-4">
+            <ScrollArea className="h-[200px] rounded-md">
+              <div className="space-y-1 p-1">
+                {types.map((type, index) => (
+                  <div
+                    key={type}
+                    className={cn(
+                      "flex items-center p-2 rounded-md cursor-pointer transition-colors",
+                      "hover:bg-gray-100",
+                      isNodeTypeSelected(type) ? "bg-gray-200" : ""
+                    )}
+                    onClick={() => handleNodeTypeToggle(type)}
+                  >
+                    <div
+                      className="flex h-5 w-5 items-center justify-center rounded border border-gray-300 mr-3 flex-shrink-0 bg-white"
+                      style={{
+                        borderColor: isNodeTypeSelected(type)
+                          ? colors[index]
+                          : undefined,
+                        borderWidth: isNodeTypeSelected(type) ? "2px" : "1px",
+                      }}
+                    >
+                      {isNodeTypeSelected(type) && (
+                        <Check
+                          className="h-3.5 w-3.5"
+                          style={{ color: colors[index] }}
+                        />
+                      )}
+                    </div>
+                    <div
+                      className="w-4 h-4 rounded-full mr-3 border border-gray-200 flex-shrink-0"
+                      style={{ backgroundColor: colors[index] }}
+                    ></div>
+                    <span className="text-sm text-gray-700 capitalize">
+                      {type}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </ScrollArea>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       <ForceGraph2D
@@ -258,11 +318,14 @@ export default function Page() {
         // val to set node size
         nodeVal={(node: any) => {
           // If a type is selected and this node is not of that type, set size to 0 to hide it
-          if (selectedNodeType && node.entity?.type !== selectedNodeType) {
+          if (
+            selectedNodeTypes.size > 0 &&
+            !selectedNodeTypes.has(node.entity?.type)
+          ) {
             return 0; // Make the node invisible
           }
           // Make nodes of selected type slightly larger
-          if (selectedNodeType && node.entity?.type === selectedNodeType) {
+          if (selectedNodeTypes.has(node.entity?.type)) {
             return node.degree * 2.5; // Increase size for selected type
           }
           return node.degree * 2;
@@ -295,13 +358,13 @@ export default function Page() {
             color = "#666666"; // Default color
           }
 
-          // First check for type filtering
-          if (selectedNodeType !== null) {
-            // If a type is selected, completely hide nodes of other types
-            if (nodeType !== selectedNodeType) {
+          // Check for type filtering with multi-selection
+          if (selectedNodeTypes.size > 0) {
+            // If node types are selected, hide nodes of other types
+            if (!selectedNodeTypes.has(nodeType)) {
               return "rgba(0,0,0,0)"; // Fully transparent (hidden)
             }
-            // Nodes of selected type keep full opacity
+            // Nodes of selected types keep full opacity
             return color;
           }
 
@@ -328,8 +391,11 @@ export default function Page() {
         nodeCanvasObjectMode={() => "before"}
         // Add a highlight for the selected node
         nodeCanvasObject={(node: any, ctx, globalScale) => {
-          // If a type is selected and this node is not of that type, skip rendering any highlights
-          if (selectedNodeType && node.entity?.type !== selectedNodeType) {
+          // If a type is selected and this node is not of selected types, skip rendering
+          if (
+            selectedNodeTypes.size > 0 &&
+            !selectedNodeTypes.has(node.entity?.type)
+          ) {
             return false;
           }
 
@@ -347,8 +413,8 @@ export default function Page() {
             ctx.fill();
           }
 
-          // If this is a node of the selected type, draw a subtle highlight
-          if (selectedNodeType && node.entity?.type === selectedNodeType) {
+          // If this is a node of a selected type, draw a subtle highlight
+          if (selectedNodeTypes.has(node.entity?.type)) {
             ctx.beginPath();
             ctx.arc(
               node.x || 0,
@@ -375,8 +441,8 @@ export default function Page() {
           // Define base colors for links
           const baseColor = "#a3b4bd"; // Default color
 
-          // If a node type is selected, check if this link connects nodes of that type
-          if (selectedNodeType) {
+          // If node types are selected, check if this link connects nodes of those types
+          if (selectedNodeTypes.size > 0) {
             const sourceNode =
               typeof link.source === "object"
                 ? link.source
@@ -389,15 +455,15 @@ export default function Page() {
             const sourceType = sourceNode?.entity?.type;
             const targetType = targetNode?.entity?.type;
 
-            // Only show links where BOTH nodes are of the selected type
+            // Only show links where BOTH nodes are of the selected types
             if (
-              sourceType !== selectedNodeType ||
-              targetType !== selectedNodeType
+              !selectedNodeTypes.has(sourceType) ||
+              !selectedNodeTypes.has(targetType)
             ) {
               return "rgba(0,0,0,0)"; // Fully transparent (hidden)
             }
 
-            // If both nodes are of the selected type, show the link
+            // If both nodes are of selected types, show the link
             return baseColor;
           }
 
@@ -415,8 +481,8 @@ export default function Page() {
         }}
         // 箭頭粒子
         linkDirectionalParticles={(link: any) => {
-          // Show particles for links of selected node type
-          if (selectedNodeType) {
+          // Show particles for links of selected node types
+          if (selectedNodeTypes.size > 0) {
             const sourceNode =
               typeof link.source === "object"
                 ? link.source
@@ -429,10 +495,10 @@ export default function Page() {
             const sourceType = sourceNode?.entity?.type;
             const targetType = targetNode?.entity?.type;
 
-            // Only show particles for links where both nodes are of the selected type
+            // Only show particles for links where both nodes are of the selected types
             if (
-              sourceType === selectedNodeType &&
-              targetType === selectedNodeType
+              selectedNodeTypes.has(sourceType) &&
+              selectedNodeTypes.has(targetType)
             ) {
               return 1;
             }
