@@ -23,8 +23,8 @@ export default function Page() {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   // Add state to track if the legend is expanded
   const [isLegendExpanded, setIsLegendExpanded] = useState<boolean>(true);
-  // Add state to track selected node type for filtering
-  const [selectedType, setSelectedType] = useState<string | null>(null);
+  // Add state to track selected node type
+  const [selectedNodeType, setSelectedNodeType] = useState<string | null>(null);
 
   // Function to check if a node is connected to the selected node
   const isNodeConnected = (nodeId: string) => {
@@ -149,9 +149,8 @@ export default function Page() {
   const handleReset = () => {
     // Clear node selection
     setSelectedNode(null);
-
-    // Clear type filter
-    setSelectedType(null);
+    // Clear selected node type
+    setSelectedNodeType(null);
 
     // Reset zoom and center if graph is available
     if (graphRef.current) {
@@ -160,18 +159,36 @@ export default function Page() {
     }
   };
 
-  // Handle type filter click in legend
-  const handleTypeClick = (type: string) => {
+  // Handle click on a node type in the legend
+  const handleNodeTypeClick = (type: string) => {
     // Toggle selection: if clicking the already selected type, deselect it
-    setSelectedType(selectedType === type ? null : type);
+    setSelectedNodeType(selectedNodeType === type ? null : type);
 
-    // Clear node selection when changing type filter
-    setSelectedNode(null);
+    // Clear node selection when selecting a type
+    if (selectedNodeType !== type) {
+      setSelectedNode(null);
 
-    // Reset zoom to show all filtered nodes
-    if (graphRef.current) {
-      graphRef.current.centerAt(0, 0, 1000);
-      graphRef.current.zoom(0.4, 1000);
+      // Find all nodes of this type
+      const nodesOfType = graphData.nodes.filter(
+        (node: any) => node.entity?.type === type
+      );
+
+      if (nodesOfType.length > 0 && graphRef.current) {
+        // Center the graph at the position of the first node of this type
+        const firstNode = nodesOfType[0];
+        if (firstNode.x !== undefined && firstNode.y !== undefined) {
+          graphRef.current.centerAt(firstNode.x, firstNode.y, 1000);
+
+          // Calculate appropriate zoom level based on the number and spread of nodes
+          const zoomLevel = Math.max(0.8, 3 - Math.log(nodesOfType.length) / 2);
+          graphRef.current.zoom(zoomLevel, 1000);
+        }
+      }
+    } else {
+      // If deselecting, zoom out to default
+      if (graphRef.current) {
+        graphRef.current.zoom(0.6, 1000);
+      }
     }
   };
 
@@ -209,9 +226,9 @@ export default function Page() {
               <div
                 key={type}
                 className={`flex items-center p-1 rounded hover:bg-gray-100 cursor-pointer ${
-                  selectedType === type ? "bg-gray-200" : ""
+                  selectedNodeType === type ? "bg-gray-200" : ""
                 }`}
-                onClick={() => handleTypeClick(type)}
+                onClick={() => handleNodeTypeClick(type)}
               >
                 <div
                   className="w-5 h-5 rounded-full mr-3 border border-gray-200"
@@ -225,46 +242,7 @@ export default function Page() {
       </div>
 
       <ForceGraph2D
-        graphData={
-          selectedType
-            ? {
-                nodes: graphData.nodes.filter((node: any) =>
-                  selectedType === "other"
-                    ? !types.includes(node.entity?.type) || !node.entity?.type
-                    : node.entity?.type === selectedType
-                ),
-                links: graphData.links.filter((link: any) => {
-                  // Keep links where both source and target match the filter
-                  const sourceNode =
-                    typeof link.source === "object"
-                      ? link.source
-                      : graphData.nodes.find((n: any) => n.id === link.source);
-
-                  const targetNode =
-                    typeof link.target === "object"
-                      ? link.target
-                      : graphData.nodes.find((n: any) => n.id === link.target);
-
-                  if (!sourceNode || !targetNode) return false;
-
-                  const sourceMatches =
-                    selectedType === "other"
-                      ? !types.includes(sourceNode.entity?.type) ||
-                        !sourceNode.entity?.type
-                      : sourceNode.entity?.type === selectedType;
-
-                  const targetMatches =
-                    selectedType === "other"
-                      ? !types.includes(targetNode.entity?.type) ||
-                        !targetNode.entity?.type
-                      : targetNode.entity?.type === selectedType;
-
-                  // Only show links where both nodes match the selected type
-                  return sourceMatches && targetMatches;
-                }),
-              }
-            : graphData
-        }
+        graphData={graphData}
         backgroundColor="transparent"
         /*
 
@@ -278,7 +256,17 @@ export default function Page() {
         // hover show the title
         nodeLabel="title"
         // val to set node size
-        nodeVal={(node: any) => node.degree * 2}
+        nodeVal={(node: any) => {
+          // If a type is selected and this node is not of that type, set size to 0 to hide it
+          if (selectedNodeType && node.entity?.type !== selectedNodeType) {
+            return 0; // Make the node invisible
+          }
+          // Make nodes of selected type slightly larger
+          if (selectedNodeType && node.entity?.type === selectedNodeType) {
+            return node.degree * 2.5; // Increase size for selected type
+          }
+          return node.degree * 2;
+        }}
         // node color with opacity
         nodeColor={(node: any) => {
           // Set colors based on node type
@@ -307,7 +295,17 @@ export default function Page() {
             color = "#666666"; // Default color
           }
 
-          // Apply opacity based on selection
+          // First check for type filtering
+          if (selectedNodeType !== null) {
+            // If a type is selected, completely hide nodes of other types
+            if (nodeType !== selectedNodeType) {
+              return "rgba(0,0,0,0)"; // Fully transparent (hidden)
+            }
+            // Nodes of selected type keep full opacity
+            return color;
+          }
+
+          // If no type is selected, apply node selection logic
           if (!selectedNode) {
             return color; // Full opacity when no selection
           }
@@ -330,6 +328,11 @@ export default function Page() {
         nodeCanvasObjectMode={() => "before"}
         // Add a highlight for the selected node
         nodeCanvasObject={(node: any, ctx, globalScale) => {
+          // If a type is selected and this node is not of that type, skip rendering any highlights
+          if (selectedNodeType && node.entity?.type !== selectedNodeType) {
+            return false;
+          }
+
           // If this is the selected node, draw a highlight ring
           if (selectedNode && node.id === selectedNode) {
             ctx.beginPath();
@@ -344,6 +347,20 @@ export default function Page() {
             ctx.fill();
           }
 
+          // If this is a node of the selected type, draw a subtle highlight
+          if (selectedNodeType && node.entity?.type === selectedNodeType) {
+            ctx.beginPath();
+            ctx.arc(
+              node.x || 0,
+              node.y || 0,
+              4 * (node.degree * 2) + 1,
+              0,
+              2 * Math.PI
+            );
+            ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+            ctx.fill();
+          }
+
           return false; // Return false to continue with default node rendering
         }}
         /*
@@ -353,28 +370,38 @@ export default function Page() {
 
 
         */
-        // 定義連結標籤
-        // linkLabel={(link: any) =>
-        //   `${
-        //     typeof link.source === "object" ? link.source.id : link.source
-        //   } → ${
-        //     typeof link.target === "object" ? link.target.id : link.target
-        //   }${link.graph ? ` (${link.graph})` : ""}`
-        // }
-        // link width based on visibility
-        // linkWidth={(link: any) => {
-        //   // Make selected links thicker
-        //   if (selectedNode && isLinkConnected(link)) {
-        //     return 2; // Thicker for connected links
-        //   }
-        //   return 1; // Default width
-        // }}
         // link color with opacity
         linkColor={(link: any) => {
           // Define base colors for links
           const baseColor = "#a3b4bd"; // Default color
 
-          // If no node is selected, use normal opacity
+          // If a node type is selected, check if this link connects nodes of that type
+          if (selectedNodeType) {
+            const sourceNode =
+              typeof link.source === "object"
+                ? link.source
+                : graphData.nodes.find((n: any) => n.id === link.source);
+            const targetNode =
+              typeof link.target === "object"
+                ? link.target
+                : graphData.nodes.find((n: any) => n.id === link.target);
+
+            const sourceType = sourceNode?.entity?.type;
+            const targetType = targetNode?.entity?.type;
+
+            // Only show links where BOTH nodes are of the selected type
+            if (
+              sourceType !== selectedNodeType ||
+              targetType !== selectedNodeType
+            ) {
+              return "rgba(0,0,0,0)"; // Fully transparent (hidden)
+            }
+
+            // If both nodes are of the selected type, show the link
+            return baseColor;
+          }
+
+          // If no node type is selected, follow the regular node selection logic
           if (!selectedNode) {
             return baseColor;
           }
@@ -386,18 +413,35 @@ export default function Page() {
 
           return baseColor; // Original color for connected links
         }}
-        // Add directional arrows to links
-        // linkDirectionalArrowLength={(link: any) =>
-        //   selectedNode && isLinkConnected(link) ? 5 : 0
-        // }
-        // 箭頭顏色
-        // linkDirectionalArrowColor={() => "gray"}
-        // 箭頭位置 (0: start, 1: end)
-        // linkDirectionalArrowRelPos={0.7}
         // 箭頭粒子
-        linkDirectionalParticles={(link: any) =>
-          selectedNode && isLinkConnected(link) ? 1 : 0
-        }
+        linkDirectionalParticles={(link: any) => {
+          // Show particles for links of selected node type
+          if (selectedNodeType) {
+            const sourceNode =
+              typeof link.source === "object"
+                ? link.source
+                : graphData.nodes.find((n: any) => n.id === link.source);
+            const targetNode =
+              typeof link.target === "object"
+                ? link.target
+                : graphData.nodes.find((n: any) => n.id === link.target);
+
+            const sourceType = sourceNode?.entity?.type;
+            const targetType = targetNode?.entity?.type;
+
+            // Only show particles for links where both nodes are of the selected type
+            if (
+              sourceType === selectedNodeType &&
+              targetType === selectedNodeType
+            ) {
+              return 1;
+            }
+            return 0;
+          }
+
+          // Otherwise follow the regular node selection logic
+          return selectedNode && isLinkConnected(link) ? 1 : 0;
+        }}
         // 箭頭粒子速度
         linkDirectionalParticleSpeed={() => 0.01}
         // 箭頭粒子寬度
@@ -442,13 +486,7 @@ export default function Page() {
         d3AlphaDecay={0.01}
         d3VelocityDecay={0.25}
         warmupTicks={200} // More ticks for initial layout of 2000 nodes
-        // Enable tree-like visualization
-        // dagMode="radialout"
         dagLevelDistance={35}
-        // Adjust force parameters for tree structure
-        // linkDistance={40} // Longer distance between nodes
-        // nodeStrength={-150} // Stronger repulsive force
-        // linkStrength={0.8} // Stronger link force
       />
     </div>
   );
