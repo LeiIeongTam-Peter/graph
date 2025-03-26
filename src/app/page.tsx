@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { graphData } from "./data";
 import { colors } from "./data";
 import { types } from "./data";
+import { filterTypesBySearch } from "./data";
 
 // Import ShadCN components
 import {
@@ -15,13 +16,20 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, Check, RotateCcw } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Check,
+  RotateCcw,
+  Search,
+  X,
+} from "lucide-react";
 
 // Dynamically import ForceGraph2D with ssr disabled
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center">
+    <div className="w-full h-[100vh] flex items-center justify-center">
       Loading graph...
     </div>
   ),
@@ -38,6 +46,10 @@ export default function Page() {
   const [selectedNodeTypes, setSelectedNodeTypes] = useState<Set<string>>(
     new Set()
   );
+  // Add state for search query
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  // Filtered types based on search
+  const filteredTypes = filterTypesBySearch(searchQuery);
 
   // Function to check if a node is connected to the selected node
   const isNodeConnected = (nodeId: string) => {
@@ -55,19 +67,6 @@ export default function Page() {
         (targetId === selectedNode && sourceId === nodeId)
       );
     });
-  };
-
-  // Function to check if a link is connected to the selected node
-  const isLinkConnected = (link: any) => {
-    if (!selectedNode) return false;
-
-    const sourceId =
-      typeof link.source === "object" ? link.source.id : link.source;
-    const targetId =
-      typeof link.target === "object" ? link.target.id : link.target;
-
-    // Check if this link is connected to the selected node
-    return sourceId === selectedNode || targetId === selectedNode;
   };
 
   // Function to calculate the appropriate zoom level based on node connections
@@ -203,8 +202,8 @@ export default function Page() {
 
               // Calculate appropriate zoom level based on the number and spread of nodes
               const zoomLevel = Math.max(
-                0.8,
-                3 - Math.log(nodesOfType.length) / 2
+                0.6,
+                2 - Math.log(nodesOfType.length) / 1
               );
               graphRef.current.zoom(zoomLevel, 1000);
             }
@@ -267,14 +266,14 @@ export default function Page() {
       </Button>
 
       {/* Color Legend Sheet using ShadCN Collapsible */}
-      <div className="absolute bottom-4 right-4 z-10 w-[220px]">
+      <div className="absolute bottom-4 left-4 z-10 w-[220px]">
         <Collapsible
           open={isLegendExpanded}
           onOpenChange={setIsLegendExpanded}
           className="border rounded-md shadow-md bg-white bg-opacity-90"
         >
           <CollapsibleTrigger className="flex w-full items-center justify-between p-4 group">
-            <h3 className="text-sm font-medium">Node Types</h3>
+            <h3 className="text-sm font-medium">Entity Types</h3>
             <div className="text-gray-500">
               {isLegendExpanded ? (
                 <ChevronDown className="h-4 w-4" />
@@ -284,44 +283,78 @@ export default function Page() {
             </div>
           </CollapsibleTrigger>
 
-          <CollapsibleContent className="px-4 pb-4">
+          <CollapsibleContent className="px-2 pb-2">
+            {/* Search input */}
+            <div className="relative mb-3">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+                <Search className="h-4 w-4 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search types..."
+                className="w-full pl-8 pr-8 py-1.5 text-sm rounded-md border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white"
+              />
+              {searchQuery && (
+                <div
+                  className="absolute inset-y-0 right-0 flex items-center pr-2 cursor-pointer"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                </div>
+              )}
+            </div>
+
             <ScrollArea className="h-[200px] rounded-md">
               <div className="space-y-1 p-1">
-                {types.map((type, index) => (
-                  <div
-                    key={type}
-                    className={cn(
-                      "flex items-center p-2 rounded-md cursor-pointer transition-colors",
-                      "hover:bg-gray-100",
-                      isNodeTypeSelected(type) ? "bg-gray-200" : ""
-                    )}
-                    onClick={() => handleNodeTypeToggle(type)}
-                  >
-                    <div
-                      className="flex h-5 w-5 items-center justify-center rounded border border-gray-300 mr-3 flex-shrink-0 bg-white"
-                      style={{
-                        borderColor: isNodeTypeSelected(type)
-                          ? colors[index]
-                          : undefined,
-                        borderWidth: isNodeTypeSelected(type) ? "2px" : "1px",
-                      }}
-                    >
-                      {isNodeTypeSelected(type) && (
-                        <Check
-                          className="h-3.5 w-3.5"
-                          style={{ color: colors[index] }}
-                        />
-                      )}
-                    </div>
-                    <div
-                      className="w-4 h-4 rounded-full mr-3 border border-gray-200 flex-shrink-0"
-                      style={{ backgroundColor: colors[index] }}
-                    ></div>
-                    <span className="text-sm text-gray-700 capitalize">
-                      {type}
-                    </span>
+                {filteredTypes.length === 0 ? (
+                  <div className="text-sm text-gray-500 italic text-center py-2">
+                    No matching types found
                   </div>
-                ))}
+                ) : (
+                  filteredTypes.map((type: string, index: number) => {
+                    // Find the original index to get the correct color
+                    const originalIndex = types.indexOf(type);
+                    return (
+                      <div
+                        key={type}
+                        className={cn(
+                          "flex items-center p-2 rounded-md cursor-pointer transition-colors",
+                          "hover:bg-gray-100",
+                          isNodeTypeSelected(type) ? "bg-gray-200" : ""
+                        )}
+                        onClick={() => handleNodeTypeToggle(type)}
+                      >
+                        <div
+                          className="flex h-5 w-5 items-center justify-center rounded border border-gray-300 mr-3 flex-shrink-0 bg-white"
+                          style={{
+                            borderColor: isNodeTypeSelected(type)
+                              ? colors[originalIndex]
+                              : undefined,
+                            borderWidth: isNodeTypeSelected(type)
+                              ? "2px"
+                              : "1px",
+                          }}
+                        >
+                          {isNodeTypeSelected(type) && (
+                            <Check
+                              className="h-3.5 w-3.5"
+                              style={{ color: colors[originalIndex] }}
+                            />
+                          )}
+                        </div>
+                        <div
+                          className="w-4 h-4 rounded-full mr-3 border border-gray-200 flex-shrink-0"
+                          style={{ backgroundColor: colors[originalIndex] }}
+                        ></div>
+                        <span className="text-sm text-gray-700 capitalize">
+                          {type}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </ScrollArea>
           </CollapsibleContent>

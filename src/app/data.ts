@@ -318,3 +318,15 @@ export const colors = [
   "#f472b6", // pink-400
   "#94a3b8", // slate-400
 ];
+
+// Search function to filter types based on query
+export const filterTypesBySearch = (query: string): string[] => {
+  if (!query || query.trim() === "") {
+    return types; // Return all types if no query
+  }
+
+  const normalizedQuery = query.toLowerCase().trim();
+
+  // Filter types that include the search query
+  return types.filter((type) => type.toLowerCase().includes(normalizedQuery));
+};
